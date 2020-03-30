@@ -58,6 +58,12 @@ app.magMax = [0.0, 0.0, 0.0];
 //minimum magnetometer values within magHistoryMax
 app.magMin = [0.0, 0.0, 0.0];
 
+//magnetometer watcher object
+var magWatchID = 0; 
+
+//accelerometer watcher object
+var acWatchID = 0;
+
 
 /**
  * Flags
@@ -124,149 +130,25 @@ app.neuralNet = new app.Architect.LSTM(1, 1, 1, 1); //this will be redefined lat
 
 /************************************************************
  *************************************************************
- **************** CHECK SENSOR AVAILABILITY ******************
+ **************** INITIALIZE SENSORS *************************
  *************************************************************
  ************************************************************/
-function initGenericSensorAPI() {
+ /**
+ * Low level initialization 
+ */
+document.addEventListener('deviceready', function() { onDeviceReady(); }, false);
 
-	//error splash
-	var errorSplash = document.querySelector('.splash-load-error');
+/**
+ * When low level initialization complete, this function is called.
+ */
+function onDeviceReady() {
 
-    navigator.permissions.query({
-            name: 'accelerometer'
-        })
-        .then(result => {
-            if (result.state === 'denied') {
-                console.log('Permission to use accelerometer sensor is denied.');
+    console.log("onDeviceReady()");
 
-                //display error splash screen
-                errorSplash.style.display = 'block';
-                return;
-            }
-            // Use the sensor.
-
-            let accelerometer = null;
-            try {
-                accelerometer = new Accelerometer({
-                    frequency: 10,
-                    referenceFrame: 'device'
-                });
-                accelerometer.addEventListener('error', event => {
-                    // Handle runtime errors.
-                    if (event.error.name === 'NotAllowedError') {
-                        // Branch to code for requesting permission.
-                        console.log('Branch to code for requesting accelerometer permission.');
-
-                        //display error splash screen
-                		errorSplash.style.display = 'block';
-
-                    } else if (event.error.name === 'NotReadableError accelerometer') {
-                        console.log('Cannot connect to the accelerometer sensor.');
-
-                        //display error splash screen
-                		errorSplash.style.display = 'block';
-                    }
-                });
-                // accelerometer.addEventListener('reading', () => reloadOnShake(accelerometer));
-                accelerometer.addEventListener("reading", () => {
-             //       console.log("accelerometer.x/y/z: " + accelerometer.x + " " + accelerometer.y + " " + accelerometer.z);
-                    app.lastAccReading.x = accelerometer.x;
-                    app.lastAccReading.y = accelerometer.y;
-                    app.lastAccReading.z = accelerometer.z;
-                });
-                accelerometer.start();
-            } catch (error) {
-                // Handle construction errors.
-                if (error.name === 'SecurityError') {
-                    // See the note above about feature policy.
-                    console.log('Accelerometer sensor construction was blocked by a feature policy or permission.');
-
-                    //display error splash screen
-                	errorSplash.style.display = 'block';
-
-                } else if (error.name === 'ReferenceError') {
-                    console.log('Accelerometer sensor is not supported by the User Agent.');
-
-                    //display error splash screen
-                	errorSplash.style.display = 'block';
-
-                } else {
-                    console.log('Accelerometer throw error');
-
-                    errorSplash.style.display = 'block';
-                    throw error;
-                }
-            }
-        });
-
-    navigator.permissions.query({
-            name: 'magnetometer'
-        })
-        .then(result => {
-            if (result.state === 'denied') {
-                console.log('Permission to use magnetometer sensor is denied.');
-
-                //display error splash screen
-                errorSplash.style.display = 'block';
-
-                return;
-            }
-            // Use the sensor.
-
-            let magnetometer = null;
-            try {
-                magnetometer = new Magnetometer({
-                    frequency: 10,
-                    referenceFrame: 'device'
-                });
-                magnetometer.addEventListener('error', event => {
-                    // Handle runtime errors.
-                    if (event.error.name === 'NotAllowedError') {
-                        // Branch to code for requesting permission.
-                        console.log('Branch to code for requesting magnetometer permission.');
-
-                        //display error splash screen
-                		errorSplash.style.display = 'block';
-
-                    } else if (event.error.name === 'NotReadableError') {
-                        console.log('Cannot connect to the magnetometer sensor.');
-
-                        //display error splash screen
-                		errorSplash.style.display = 'block';
-                    }
-                });
-                //  magnetometer.addEventListener('reading', () => reloadOnShake(magnetometer));
-                magnetometer.addEventListener("reading", () => {
-             //       console.log("magnetometer.x/y/z: " + magnetometer.x + " " + magnetometer.y + " " + magnetometer.z);
-                    app.lastMagReading.x = magnetometer.x;
-                    app.lastMagReading.y = magnetometer.y;
-                    app.lastMagReading.z = magnetometer.z;
-                });
-                magnetometer.start();
-            } catch (error) {
-                // Handle construction errors.
-                if (error.name === 'SecurityError') {
-                    // See the note above about feature policy.
-                    console.log('magnetometer Sensor construction was blocked by a feature policy or permission.');
-
-                    //display error splash screen
-                	errorSplash.style.display = 'block';
-
-                } else if (error.name === 'ReferenceError') {
-                    console.log('magnetometer Sensor is not supported by the User Agent.');
-
-                    //display error splash screen
-                	errorSplash.style.display = 'block';
-                } else {
-                    console.log('magnetometer throw error');
-
-                    errorSplash.style.display = 'block';
-                    throw error;
-                }
-            }
-        });
-
+    watchAccelerometer();
+    watchMagnetometer();
 }
+
 
 
 /************************************************************
@@ -922,6 +804,76 @@ app.alertDetect = function() {
         app.betweenDetectionsFalseIntervalFlag = true;
     }
 };
+
+
+
+
+
+/************************************************************
+ *************************************************************
+ **************** GET ACCELEROMETER DATA *********************
+ *************************************************************
+ ************************************************************/
+
+function watchAccelerometer()
+{
+    function onSuccess(acceleration)
+    {
+        //update latest sample
+        app.lastAccReading.x = acceleration.x;
+        app.lastAccReading.y = acceleration.y;
+        app.lastAccReading.z = acceleration.z;
+
+    }
+
+    function onError(error)
+    {
+        console.log('Accelerometer error: ' + error)
+    }
+
+    acWatchID = navigator.accelerometer.watchAcceleration(
+        onSuccess,
+        onError,
+        { frequency: 200 })
+}
+
+
+
+
+
+
+/************************************************************
+ *************************************************************
+ **************** GET MAGNETOMETER DATA **********************
+ *************************************************************
+ ************************************************************/
+
+function watchMagnetometer() {
+ //   console.log('watchMagnetometer()'); 
+    if (window.cordova && cordova.plugins && cordova.plugins.magnetometer) {
+        magWatchID = cordova.plugins.magnetometer.watchReadings(
+            function success (reading) {
+
+                // COLLECT READINGS
+                app.lastMagReading = {
+                    x: reading.x,
+                    y: reading.y,
+                    z: reading.z,
+                    magnitude: reading.magnitude
+                };
+            },
+            function error (err) {
+                console.log(err);
+            }
+        );
+
+    } else {
+        console.log('No magnetometer plugin!!');
+        console.log('cordova = ' + !!window.cordova);
+        console.log('cordova.plugins = ' + !!cordova.plugins);
+        console.log('cordova.plugins.magnetometer = ' + !!cordova.plugins.magnetometer);
+    }
+}
 
 
 
